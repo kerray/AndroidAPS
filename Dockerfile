@@ -28,6 +28,7 @@ WORKDIR /build
 
 # Copy source and build
 COPY . .
+RUN git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null; true
 ARG GRADLE_OPTS="-Xmx4g"
 RUN ./gradlew :app:assembleFullRelease --no-daemon
 
