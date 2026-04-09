@@ -1,0 +1,12 @@
+.git
+.gradle
+.idea
+build/
+*/build/
+*.apk
+*.apk.idsig
+keystore.jks
+*.keystore
+*.jks
+android-ndk-*
+local.properties
