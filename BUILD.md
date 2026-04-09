@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Java Development Kit (JDK) 17+
+- Java Development Kit (JDK) 21+
 - Android SDK with Build Tools
 - Android NDK r25b+
 - `ANDROID_HOME` environment variable pointing to your SDK

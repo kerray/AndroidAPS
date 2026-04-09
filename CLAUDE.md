@@ -11,7 +11,7 @@ Personal fork of [nightscout/AndroidAPS](https://github.com/nightscout/AndroidAP
 ## Building
 
 ### Prerequisites
-- JDK 17+ (project has moved to newer Kotlin/AGP)
+- JDK 21+ (project has moved to newer Kotlin/AGP)
 - Android SDK with build-tools
 - Android NDK r25b+ (for native components)
 - `ANDROID_HOME` environment variable set

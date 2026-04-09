@@ -1,4 +1,4 @@
-FROM eclipse-temurin:17-jdk
+FROM eclipse-temurin:21-jdk
 
 # Install required tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
