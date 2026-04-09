@@ -33,3 +33,8 @@ wear/pumpcontrol/*
 /buildSrc/.kotlin
 .claude/settings.local.json
 .claude/CLAUDE_COMMANDS.md
+
+# Signing keys (never commit)
+keystore.jks
+*.keystore
+*.jks
