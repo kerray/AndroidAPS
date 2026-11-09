@@ -1,50 +1,72 @@
 # AndroidAPS Build and Signing Guide
 
+AndroidAPS doses insulin. **Build stable upstream release tags only** — never dev/nightly
+without an explicit decision.
+
 ## Docker Build (recommended)
 
-The easiest way to build. All dependencies (JDK, SDK, NDK) are handled by the Docker image.
+All dependencies (JDK 21, Android SDK) are handled by the Docker image. The build context is a
+**clean clone of an upstream release tag**; the `Dockerfile` from this branch is passed with `-f`,
+so nothing from this fork ends up in the APK.
 
 ```bash
-# 1. Build the Docker image (first run downloads ~3GB of SDK/NDK, subsequent builds use cache)
-docker build --build-arg GRADLE_OPTS="-Xmx6g" -t androidaps-builder .
-
-# 2. Sign the APK (mount keystore + output dir)
-mkdir -p ./output
-KEYSTORE_PASSWORD=<password> docker run --rm \
-  -v "$(pwd)/keystore.jks":/keystore.jks:ro \
-  -v "$(pwd)/output":/output \
-  -e KEYSTORE_PASSWORD \
-  androidaps-builder
-
-# 3. Verify
-ls -lh ./output/app-full-release-signed.apk
+# One step (clone tag, build image, sign):
+./docker-build.sh 4.0.0 /opt/androidaps/keystore.jks /opt/androidaps/.keystore-password /opt/androidaps/output
 ```
 
-Or use the wrapper script: `KEYSTORE_PASSWORD=<password> ./docker-build.sh`
+Or by hand:
+
+```bash
+# 1. Clean source of the release tag
+git clone --depth 1 --branch 4.0.0 https://github.com/nightscout/AndroidAPS.git /tmp/aaps-src
+
+# 2. Build the image (SDK download + Gradle; ~8 min on aretea, cached SDK layers afterwards)
+docker build -f Dockerfile -t aaps:4.0.0 /tmp/aaps-src
+
+# 3. Sign the APK (keystore, password file and output dir are mounted at run time)
+docker run --rm \
+  -v /opt/androidaps/keystore.jks:/keystore.jks:ro \
+  -v /opt/androidaps/.keystore-password:/keystore-password:ro \
+  -v /opt/androidaps/output:/output \
+  -e OUT_NAME=aaps-4.0.0-full-signed.apk \
+  aaps:4.0.0
+```
+
+Output: `/opt/androidaps/output/aaps-4.0.0-full-signed.apk`
+
+### Verify before installing (mandatory)
+
+The sign step prints the certificate of the new APK and, if present in the output dir, of the
+previous `app-full-release-signed.apk`. The **certificate SHA-256 digest must be identical**:
+
+```
+66e96293661de47fbe106a455962512406116b8a85c60689bf3267b7f41705e9
+```
+
+If it differs, do not install or upload the APK — Android would refuse the update, and it
+means the wrong keystore was used.
 
 ### How it works
 
-- `docker build` creates an image with JDK 21, Android SDK 34, NDK r25b, and runs `./gradlew :app:assembleFullRelease` — the unsigned APK is baked into the image
-- `docker run` mounts the keystore read-only, runs `zipalign` + `apksigner`, outputs the signed APK to `./output/`
-- The keystore never enters the Docker image
-- `.git` is included in the Docker context (needed for version info in the app UI)
+- `docker build` creates an image with JDK 21, the Android SDK (platform `android-37.0`, newest
+  build-tools) and runs `./gradlew :app:assembleFullRelease` — the unsigned APK is baked into the image
+- `docker run` mounts the keystore and the password file read-only, runs `zipalign` + `apksigner`
+  (`--ks-pass file:`), and writes the signed APK to the mounted output dir
+- The keystore and its password never enter the Docker image, argv or environment
+- `.git` is part of the build context (needed for version info in the app UI)
+- No NDK is needed
 
-### Memory tuning
+### Memory and disk
 
-Default Gradle heap is 4GB. Adjust with `--build-arg`:
-
-```bash
-docker build --build-arg GRADLE_OPTS="-Xmx3g" -t androidaps-builder .  # less RAM
-docker build --build-arg GRADLE_OPTS="-Xmx6g" -t androidaps-builder .  # more RAM (faster)
-```
+Gradle heap is 6GB (`GRADLE_OPTS` in the `Dockerfile`). The image is ~6GB and the build cache
+grows by several GB; check free disk on the build host first (`df -h /var/lib/docker`).
 
 ## Manual Build (non-Docker)
 
 ### Prerequisites
 
-- Java Development Kit (JDK) 21+
-- Android SDK with Build Tools 34
-- Android NDK r25b+
+- Java Development Kit (JDK) 21
+- Android SDK with platform `android-37.0` and current build-tools
 - `ANDROID_HOME` environment variable pointing to your SDK
 
 ### Quick Build
@@ -67,7 +89,8 @@ Output: `app/build/outputs/apk/full/release/app-full-release-unsigned.apk`
 #### 2. Align the APK
 
 ```bash
-$ANDROID_HOME/build-tools/34.0.0/zipalign -v -p 4 \
+BT=$(ls -d $ANDROID_HOME/build-tools/*/ | sort -V | tail -1)
+${BT}zipalign -p 4 \
   app/build/outputs/apk/full/release/app-full-release-unsigned.apk \
   app-full-release-unsigned-aligned.apk
 ```
@@ -75,46 +98,39 @@ $ANDROID_HOME/build-tools/34.0.0/zipalign -v -p 4 \
 #### 3. Sign the APK
 
 ```bash
-$ANDROID_HOME/build-tools/34.0.0/apksigner sign \
+${BT}apksigner sign \
   --ks keystore.jks \
-  --ks-pass pass:$KEYSTORE_PASSWORD \
+  --ks-pass file:.keystore-password \
   --out app-full-release-signed.apk \
   app-full-release-unsigned-aligned.apk
 ```
 
-#### 4. Verify (optional)
+#### 4. Verify
 
 ```bash
-$ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose app-full-release-signed.apk
+${BT}apksigner verify --print-certs app-full-release-signed.apk
 ```
 
 ## Troubleshooting
 
+### `Failed to find package 'platforms;android-37'`
+
+Since API 36.1 the platform packages carry a minor version: the package for `compileSdk = 37` is
+`platforms;android-37.0`. Check the exact names with `sdkmanager --list | grep platforms`.
+
 ### Missing SDK Components
 
 ```bash
-sdkmanager "build-tools;34.0.0" "platform-tools" "platforms;android-34"
 sdkmanager --licenses
-```
-
-### Memory Issues (non-Docker)
-
-Edit `gradle.properties` to reduce memory usage:
-
-```properties
-org.gradle.parallel=false
-org.gradle.workers.max=1
-org.gradle.jvmargs=-Xmx1536m -XX:+UseSerialGC
-org.gradle.daemon=false
-kotlin.incremental=false
+sdkmanager "platform-tools" "platforms;android-37.0" "build-tools;37.0.0"
 ```
 
 ### "uncommitted changes" error in Docker build
 
-The Dockerfile includes `git checkout -- . && git clean -fd` after `COPY` to ensure a clean
-working tree. If this fails, check that `.dockerignore` is not excluding `.git`.
+The Dockerfile runs `git checkout -- .` and `git clean -fd` after `COPY` to ensure a clean
+working tree. If this fails, check that `.git` is part of the build context.
 
 ### "invalid source release: 21"
 
 The project requires JDK 21. The Dockerfile uses `eclipse-temurin:21-jdk`. For non-Docker
-builds, ensure `java -version` shows 21+.
+builds, ensure `java -version` shows 21.

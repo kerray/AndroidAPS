@@ -9,3 +9,4 @@ keystore.jks
 *.jks
 android-ndk-*
 local.properties
+.keystore-password

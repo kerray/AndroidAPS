@@ -38,3 +38,6 @@ wear/pumpcontrol/*
 keystore.jks
 *.keystore
 *.jks
+
+# Keystore password file (never commit)
+.keystore-password
