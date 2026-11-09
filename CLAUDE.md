@@ -72,6 +72,8 @@ Backups:
 - Garage (encrypted): bucket `aaps`, `keystore/aaps-keystore-backup-YYYYMMDD.tar.age` — keystore +
   password, encrypted with `age` to the SOPS age recipient (identity: rbw `kerray-infra/sops-age-key`);
   restore instructions in `keystore/README.txt` next to it
+- Vaultwarden (rbw): `kerray-infra/aaps-keystore-jks` (base64 — `rbw get kerray-infra/aaps-keystore-jks | base64 -d > keystore.jks`),
+  keystore password in `androidAps key password`
 - GitHub Actions secrets on `kerray/AndroidAPS` (write-only, for CI): `KEYSTORE_BASE64`,
   `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`
 
