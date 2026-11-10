@@ -61,6 +61,13 @@ Signed APKs go to the **private Garage bucket `aaps`**:
 `apk/aaps-<version>-full-signed.apk`. Download via a short-lived presigned URL or the Garage
 browser — never a public link.
 
+## Installing on the phone
+
+The HyperOS installer on the Xiaomi 15 Ultra refuses the sideloaded update ("App not installed")
+although the APK is fine; install via adb over Wireless debugging with `pm install -r` instead —
+see `BUILD.md`, "Installing on the phone". Export settings in AAPS first. 4.0.0 was installed
+this way on 2026-11-10 (data retained, loop resumed).
+
 ## Keystore
 
 Signing keystore: `keystore.jks` (JKS, 2084 bytes), one key, alias `key0`, key password = keystore password.
